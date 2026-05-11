@@ -325,7 +325,6 @@ export default function DramaDetail({ id }: { id: string }) {
                         <p className="font-semibold text-white text-sm">{c.name}</p>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
                           c.role === 'protagonist' ? 'bg-orange-950/60 text-orange-400 border border-orange-900/60'
-                          : c.role === 'antagonist' ? 'bg-zinc-700 text-zinc-300'
                           : 'bg-zinc-800 text-zinc-500'
                         }`}>
                           {c.role}
