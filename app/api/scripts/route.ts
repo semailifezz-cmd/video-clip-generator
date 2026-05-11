@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callGrok } from '@/lib/xai'
 import { SCRIPT_SYSTEM_PROMPT, buildScriptPrompt } from '@/lib/prompts'
-import type { SeriesBible, EpisodeOutline, EpisodeScript } from '@/lib/types'
+import type { SeriesBible, VideoOutline, VideoScript } from '@/lib/types'
 
 function extractArray(raw: string): string | null {
   const start = raw.indexOf('[')
@@ -34,27 +34,27 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { episode, bible, formula, prevMemo }: {
-    episode: EpisodeOutline
+  const { video, bible, formula, videoLengthS }: {
+    video: VideoOutline
     bible: SeriesBible
     formula: string
-    prevMemo: string
+    videoLengthS: number
   } = await req.json()
 
   try {
-    const userPrompt = buildScriptPrompt(episode, bible, formula, prevMemo)
+    const userPrompt = buildScriptPrompt(video, bible, formula, videoLengthS)
     const raw = await callGrok(
       [
         { role: 'system', content: SCRIPT_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      { temperature: 0.9, maxTokens: 8192 }
+      { temperature: 0.9, maxTokens: 4096 }
     )
 
     const extracted = extractArray(raw)
     if (!extracted) {
       return NextResponse.json(
-        { error: `Ep ${episode.ep_num}: Gemini returned no JSON array. Response starts with: "${raw.slice(0, 300)}"` },
+        { error: `Video ${video.video_num}: Gemini returned no JSON array. Response starts with: "${raw.slice(0, 300)}"` },
         { status: 500 }
       )
     }
@@ -69,16 +69,16 @@ export async function POST(req: NextRequest) {
         const err = e2 instanceof SyntaxError ? e2 : e1 instanceof SyntaxError ? e1 : null
         const context = err ? parseContext(sanitizeJson(extracted), err) : extracted.slice(0, 300)
         return NextResponse.json(
-          { error: `Ep ${episode.ep_num} script JSON parse error — ${err?.message ?? 'unknown'}. Context: "${context}"` },
+          { error: `Video ${video.video_num} script JSON parse error — ${err?.message ?? 'unknown'}. Context: "${context}"` },
           { status: 500 }
         )
       }
     }
 
-    const script: EpisodeScript = { ep_num: episode.ep_num, scenes }
+    const script: VideoScript = { video_num: video.video_num, scenes }
     return NextResponse.json(script)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: `scripts/route ep${episode.ep_num}: ${message}` }, { status: 500 })
+    return NextResponse.json({ error: `scripts/route video${video.video_num}: ${message}` }, { status: 500 })
   }
 }

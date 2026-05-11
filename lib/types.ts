@@ -1,12 +1,7 @@
 export interface UniversePrompt {
-  series_title: string
-  genre: string
-  setting_era: string
-  core_conflict: string
-  tone: string
-  main_characters: string
-  total_episodes: number
-  episode_length_s: number
+  prompt: string
+  total_videos: number
+  video_length_s: number
   clip_length_s: number
   episode_formula: string
 }
@@ -14,7 +9,7 @@ export interface UniversePrompt {
 export interface Character {
   name: string
   age: string
-  role: 'protagonist' | 'antagonist' | 'supporting'
+  role: 'protagonist' | 'supporting'
   physical_description: string
   personality: string
   outfit_style: string
@@ -40,8 +35,8 @@ export interface Prop {
   ref_image_url?: string
 }
 
-export interface EpisodeOutline {
-  ep_num: number
+export interface VideoOutline {
+  video_num: number
   title: string
   summary: string
   characters_featured: string[]
@@ -50,21 +45,18 @@ export interface EpisodeOutline {
 }
 
 export interface SeriesBible {
-  series_title: string
+  universe_title: string
   genre: string
-  overall_arc: string
+  universe_description: string
   characters: Character[]
   venues: Venue[]
   props: Prop[]
-  episodes: EpisodeOutline[]
+  videos: VideoOutline[]
 }
 
 export interface ScenePrompt {
-  ep_num: number
-  scene_num: number
+  video_num: number
   clip_num: number
-  formula_step: number
-  segment_duration?: string
   characters_used: string[]
   venue_used: string
   props_used: string[]
@@ -77,12 +69,13 @@ export interface ScenePrompt {
   raw_prompt: string
   final_prompt?: string
   grok_ref_images?: string[]
-  video_job_id?: string
-  video_status?: 'pending' | 'processing' | 'done' | 'failed'
-  video_url?: string
 }
 
-export interface EpisodeScript {
-  ep_num: number
+export interface VideoScript {
+  video_num: number
   scenes: ScenePrompt[]
 }
+
+// Legacy aliases kept for dramaStore compatibility
+export type EpisodeOutline = VideoOutline
+export type EpisodeScript = VideoScript

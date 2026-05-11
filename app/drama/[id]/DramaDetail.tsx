@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getDramaInput, getDramaResult, getDramaEntry } from '@/lib/dramaStore'
 import type { DramaEntry } from '@/lib/dramaStore'
-import type { UniversePrompt, SeriesBible, EpisodeScript, ScenePrompt } from '@/lib/types'
+import type { UniversePrompt, SeriesBible, VideoScript, ScenePrompt } from '@/lib/types'
 import { sleep } from '@/lib/workflow'
 
 async function downloadVideo(url: string, filename: string) {
@@ -27,14 +27,14 @@ async function downloadVideo(url: string, filename: string) {
 type Tab = 'overview' | 'bible' | 'media' | 'settings'
 
 function VideoCard({
-  epNum, clipNum, url, seriesTitle,
+  videoNum, url, seriesTitle,
 }: {
-  epNum: number; clipNum: number; url: string; seriesTitle: string
+  videoNum: number; url: string; seriesTitle: string
 }) {
   const [downloading, setDownloading] = useState(false)
   const handleDownload = async () => {
     setDownloading(true)
-    await downloadVideo(url, `${seriesTitle.replace(/\s+/g, '_')}_Ep${epNum}_Clip${clipNum}.mp4`)
+    await downloadVideo(url, `${seriesTitle.replace(/\s+/g, '_')}_Video${videoNum}.mp4`)
     setDownloading(false)
   }
   return (
@@ -43,7 +43,7 @@ function VideoCard({
         <video src={url} controls playsInline className="w-full h-full object-contain" preload="metadata" />
       </div>
       <div className="p-3 flex items-center justify-between gap-2">
-        <p className="text-xs font-mono text-zinc-300 font-semibold">Clip {clipNum}</p>
+        <p className="text-xs font-mono text-zinc-300 font-semibold">Video {videoNum}</p>
         <button
           onClick={handleDownload}
           disabled={downloading}
@@ -56,19 +56,13 @@ function VideoCard({
   )
 }
 
-const STEP_LABELS: Record<number, string> = { 1: 'Humiliation', 2: 'Awakening', 3: 'Climax', 4: 'Exit' }
-
 function SceneCard({ scene }: { scene: ScenePrompt }) {
   return (
     <div className="bg-zinc-800/40 border border-zinc-700/30 rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] font-mono bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded">
-          Clip {scene.clip_num}
+        <span className="text-[10px] font-mono bg-orange-950/50 text-orange-400 border border-orange-900/40 px-1.5 py-0.5 rounded">
+          Scene {scene.clip_num}
         </span>
-        {scene.segment_duration && (
-          <span className="text-[10px] font-mono bg-zinc-700/60 text-zinc-400 px-1.5 py-0.5 rounded">{scene.segment_duration}</span>
-        )}
-        <span className="text-[10px] font-mono text-zinc-500">Step {scene.formula_step} · {STEP_LABELS[scene.formula_step] ?? ''}</span>
         <span className="text-[10px] font-mono text-zinc-600 ml-auto truncate max-w-[200px]">{scene.venue_used}</span>
       </div>
       {(scene.camera_angle || scene.camera_movement) && (
@@ -141,7 +135,7 @@ export default function DramaDetail({ id }: { id: string }) {
   const [input, setInput] = useState<UniversePrompt | null>(null)
   const [bible, setBible] = useState<SeriesBible | null>(null)
   const [refImages, setRefImages] = useState<Record<string, string>>({})
-  const [scripts, setScripts] = useState<EpisodeScript[]>([])
+  const [scripts, setScripts] = useState<VideoScript[]>([])
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
   const [notFound, setNotFound] = useState(false)
   const [tab, setTab] = useState<Tab>('overview')
@@ -167,20 +161,21 @@ export default function DramaDetail({ id }: { id: string }) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500">
         <div className="text-center">
-          <p className="text-lg mb-4">Series not found.</p>
-          <button onClick={() => router.push('/')} className="text-red-500 hover:text-red-400">← Dashboard</button>
+          <p className="text-lg mb-4">Video set not found.</p>
+          <button onClick={() => router.push('/')} className="text-orange-500 hover:text-orange-400">← Dashboard</button>
         </div>
       </div>
     )
   }
 
-  const totalClips = Object.keys(videoUrls).length
+  const totalVideos = Object.keys(videoUrls).length
   const isComplete = entry?.status === 'complete'
+  const seriesTitle = bible?.universe_title ?? input?.prompt?.slice(0, 40) ?? 'Untitled'
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'bible', label: 'Series Bible' },
-    { id: 'media', label: `Media (${totalClips} clips)` },
+    { id: 'bible', label: 'Universe Bible' },
+    { id: 'media', label: `Media (${totalVideos} videos)` },
     { id: 'settings', label: 'Input Settings' },
   ]
 
@@ -193,18 +188,10 @@ export default function DramaDetail({ id }: { id: string }) {
             ← Dashboard
           </button>
           <div className="flex-1 min-w-0">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-600">{input?.genre}</p>
-            <p className="text-base font-bold text-white truncate">{input?.series_title || 'Untitled'}</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-600">Kids Animation</p>
+            <p className="text-base font-bold text-white truncate">{seriesTitle}</p>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            {isComplete && (
-              <button
-                onClick={() => router.push(`/drama/${id}/extend`)}
-                className="text-sm bg-red-700 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                + More Episodes
-              </button>
-            )}
             {entry?.status === 'complete' && (
               <span className="text-xs font-mono text-green-400 bg-green-950/50 border border-green-900 px-3 py-1 rounded-full">Complete</span>
             )}
@@ -227,7 +214,7 @@ export default function DramaDetail({ id }: { id: string }) {
               onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-sm font-mono whitespace-nowrap transition-colors border-b-2 ${
                 tab === t.id
-                  ? 'text-white border-red-600'
+                  ? 'text-white border-orange-500'
                   : 'text-zinc-500 border-transparent hover:text-zinc-300'
               }`}
             >
@@ -244,8 +231,8 @@ export default function DramaDetail({ id }: { id: string }) {
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Episodes', value: bible?.episodes.length ?? entry?.episodeCount ?? '—' },
-                { label: 'Clips', value: totalClips || '—' },
+                { label: 'Videos', value: bible?.videos.length ?? entry?.episodeCount ?? '—' },
+                { label: 'Generated', value: totalVideos || '—' },
                 { label: 'Characters', value: bible?.characters.length ?? '—' },
                 { label: 'Venues', value: bible?.venues.length ?? '—' },
               ].map(s => (
@@ -256,37 +243,40 @@ export default function DramaDetail({ id }: { id: string }) {
               ))}
             </div>
 
-            {/* Arc */}
-            {bible?.overall_arc && (
+            {/* Universe description */}
+            {bible?.universe_description && (
               <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-3">Series Arc</p>
-                <p className="text-zinc-300 leading-relaxed">{bible.overall_arc}</p>
+                <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-3">Universe</p>
+                <p className="text-zinc-300 leading-relaxed">{bible.universe_description}</p>
               </div>
             )}
 
-            {/* Episode list */}
-            {bible && bible.episodes.length > 0 && (
+            {/* Video list */}
+            {bible && bible.videos.length > 0 && (
               <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
                 <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
-                  Episodes ({bible.episodes.length})
+                  Videos ({bible.videos.length})
                 </p>
                 <div className="space-y-3">
-                  {bible.episodes.map(ep => {
-                    const clips = [1, 2, 3, 4].filter(c => videoUrls[`ep${ep.ep_num}_clip${c}`])
+                  {bible.videos.map(v => {
+                    const hasVideo = !!videoUrls[`video${v.video_num}`]
                     return (
-                      <div key={ep.ep_num} className="flex items-start gap-4 py-3 border-b border-zinc-800 last:border-0">
+                      <div key={v.video_num} className="flex items-start gap-4 py-3 border-b border-zinc-800 last:border-0">
                         <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center text-xs font-mono text-zinc-400 flex-shrink-0 mt-0.5">
-                          {ep.ep_num}
+                          {v.video_num}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white">{ep.title}</p>
-                          <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{ep.summary}</p>
+                          <p className="text-sm font-semibold text-white">{v.title}</p>
+                          <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{v.summary}</p>
                           <p className="text-[10px] font-mono text-zinc-600 mt-1">
-                            {ep.characters_featured.join(', ')}
+                            {v.characters_featured.join(', ')}
                           </p>
                         </div>
-                        <div className="flex-shrink-0 text-[10px] font-mono text-zinc-600">
-                          {clips.length}/4 clips
+                        <div className="flex-shrink-0 text-[10px] font-mono">
+                          {hasVideo
+                            ? <span className="text-green-400">✓ ready</span>
+                            : <span className="text-zinc-600">pending</span>
+                          }
                         </div>
                       </div>
                     )
@@ -295,18 +285,18 @@ export default function DramaDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {/* Generate more CTA if no result yet */}
-            {isComplete && (
+            {/* Resume generation CTA if still generating */}
+            {entry?.status === 'generating' && (
               <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-semibold text-white">Want more episodes?</p>
-                  <p className="text-sm text-zinc-500 mt-0.5">Continue the story using existing characters, venues, and visual style.</p>
+                  <p className="font-semibold text-white">Generation in progress</p>
+                  <p className="text-sm text-zinc-500 mt-0.5">Your videos are still being created.</p>
                 </div>
                 <button
-                  onClick={() => router.push(`/drama/${id}/extend`)}
-                  className="flex-shrink-0 bg-red-700 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors text-sm"
+                  onClick={() => router.push(`/generate/${id}`)}
+                  className="flex-shrink-0 bg-orange-500 hover:bg-orange-400 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors text-sm"
                 >
-                  + Generate More Episodes
+                  View Progress →
                 </button>
               </div>
             )}
@@ -334,7 +324,7 @@ export default function DramaDetail({ id }: { id: string }) {
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold text-white text-sm">{c.name}</p>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                          c.role === 'protagonist' ? 'bg-red-950/60 text-red-400 border border-red-900/60'
+                          c.role === 'protagonist' ? 'bg-orange-950/60 text-orange-400 border border-orange-900/60'
                           : c.role === 'antagonist' ? 'bg-zinc-700 text-zinc-300'
                           : 'bg-zinc-800 text-zinc-500'
                         }`}>
@@ -413,59 +403,41 @@ export default function DramaDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {/* Videos by episode */}
-            {bible && totalClips > 0 && (
+            {/* Videos */}
+            {totalVideos > 0 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500">
-                    Generated Videos ({totalClips} clips)
+                    Generated Videos ({totalVideos})
                   </p>
                   <button
                     onClick={async () => {
                       for (const [key, url] of Object.entries(videoUrls)) {
-                        const [ep, clip] = key.replace('ep', 'Ep').replace('_clip', '_Clip').split('_')
-                        await downloadVideo(url, `${(input?.series_title ?? 'Series').replace(/\s+/g, '_')}_${ep}_${clip}.mp4`)
+                        await downloadVideo(url, `${seriesTitle.replace(/\s+/g, '_')}_${key}.mp4`)
                         await sleep(400)
                       }
                     }}
                     className="text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg transition-colors"
                   >
-                    ↓ Download All {totalClips} Clips
+                    ↓ Download All {totalVideos} Videos
                   </button>
                 </div>
-                {bible.episodes.map(ep => {
-                  const epClips = [1, 2, 3, 4]
-                    .map(c => ({ clip: c, url: videoUrls[`ep${ep.ep_num}_clip${c}`] }))
-                    .filter(c => !!c.url)
-                  if (epClips.length === 0) return null
-                  return (
-                    <div key={ep.ep_num} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                      <div className="flex items-center justify-between mb-5">
-                        <div>
-                          <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500">Episode {ep.ep_num}</p>
-                          <h3 className="text-base font-bold text-white mt-0.5">{ep.title}</h3>
-                          <p className="text-xs text-zinc-500 mt-1 max-w-xl">{ep.summary}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {bible?.videos.map(v => {
+                    const url = videoUrls[`video${v.video_num}`]
+                    if (!url) return null
+                    return (
+                      <div key={v.video_num} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
+                        <div className="mb-3">
+                          <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500">Video {v.video_num}</p>
+                          <h3 className="text-sm font-bold text-white mt-0.5">{v.title}</h3>
+                          <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{v.summary}</p>
                         </div>
-                        <button
-                          onClick={async () => {
-                            for (const { clip, url } of epClips) {
-                              await downloadVideo(url, `${(input?.series_title ?? 'Series').replace(/\s+/g, '_')}_Ep${ep.ep_num}_Clip${clip}.mp4`)
-                              await sleep(300)
-                            }
-                          }}
-                          className="flex-shrink-0 text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg transition-colors"
-                        >
-                          ↓ All {epClips.length} clips
-                        </button>
+                        <VideoCard videoNum={v.video_num} url={url} seriesTitle={seriesTitle} />
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {epClips.map(({ clip, url }) => (
-                          <VideoCard key={clip} epNum={ep.ep_num} clipNum={clip} url={url} seriesTitle={input?.series_title ?? 'Series'} />
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
 
@@ -476,11 +448,11 @@ export default function DramaDetail({ id }: { id: string }) {
                   Scene Scripts ({scripts.reduce((n, s) => n + s.scenes.length, 0)} scenes)
                 </p>
                 <div className="space-y-6">
-                  {scripts.map(ep => (
-                    <div key={ep.ep_num}>
-                      <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-3 uppercase tracking-wider">Episode {ep.ep_num}</p>
+                  {scripts.map(v => (
+                    <div key={v.video_num}>
+                      <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-3 uppercase tracking-wider">Video {v.video_num}</p>
                       <div className="space-y-3">
-                        {ep.scenes.map(scene => (
+                        {v.scenes.map(scene => (
                           <SceneCard key={scene.clip_num} scene={scene} />
                         ))}
                       </div>
@@ -490,7 +462,7 @@ export default function DramaDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {totalClips === 0 && Object.keys(refImages).length === 0 && (
+            {totalVideos === 0 && Object.keys(refImages).length === 0 && (
               <div className="text-center py-16 text-zinc-600">
                 <p className="font-mono text-sm">No media generated yet.</p>
                 {entry?.status === 'generating' && (
@@ -508,19 +480,18 @@ export default function DramaDetail({ id }: { id: string }) {
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
             <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Original Input</p>
             {[
-              { label: 'Series Title', value: input.series_title },
-              { label: 'Genre', value: input.genre },
-              { label: 'Setting & Era', value: input.setting_era },
-              { label: 'Tone', value: input.tone },
-              { label: 'Core Conflict', value: input.core_conflict },
-              { label: 'Main Characters', value: input.main_characters },
-              { label: 'Total Episodes', value: String(input.total_episodes) },
+              { label: 'Total Videos', value: String(input.total_videos) },
+              { label: 'Video Length', value: `${input.video_length_s}s` },
             ].map(f => (
               <div key={f.label} className="grid grid-cols-[160px,1fr] gap-4 py-2 border-b border-zinc-800 last:border-0">
                 <p className="text-xs font-mono text-zinc-500">{f.label}</p>
                 <p className="text-sm text-zinc-300">{f.value || '—'}</p>
               </div>
             ))}
+            <div className="py-2 border-b border-zinc-800">
+              <p className="text-xs font-mono text-zinc-500 mb-1.5">Prompt</p>
+              <p className="text-sm text-zinc-300 leading-relaxed">{input.prompt}</p>
+            </div>
             <div className="pt-2">
               <p className="text-xs font-mono text-zinc-500 mb-2">Episode Formula</p>
               <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed bg-zinc-800/40 rounded-lg p-4">

@@ -1,24 +1,20 @@
-import type { SeriesBible, EpisodeScript, EpisodeOutline } from './types'
+import type { SeriesBible, VideoScript } from './types'
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-export function buildContinuityMemo(episode: EpisodeOutline): string {
-  return `Episode ${episode.ep_num} "${episode.title}" ended with: ${episode.summary}. Characters involved: ${episode.characters_featured.join(', ')}.`
-}
-
 export function injectRefUrls(
-  scripts: EpisodeScript[],
+  scripts: VideoScript[],
   refImages: Record<string, string>,
   bible: SeriesBible
-): EpisodeScript[] {
-  return scripts.map(episode => ({
-    ...episode,
-    scenes: episode.scenes.map(scene => {
+): VideoScript[] {
+  return scripts.map(video => ({
+    ...video,
+    scenes: video.scenes.map(scene => {
       const refs: string[] = []
 
-      // Protagonist always @image1
+      // Protagonist always first
       const protagonist = bible.characters.find(c => c.role === 'protagonist')
       if (protagonist && refImages[protagonist.name]) {
         refs.push(refImages[protagonist.name])
@@ -37,12 +33,10 @@ export function injectRefUrls(
         refs.push(refImages[scene.venue_used])
       }
 
-      const finalRefs = refs.slice(0, 7)
-
       return {
         ...scene,
-        final_prompt: scene.raw_prompt, // image_urls passed separately — no @imageN tags needed
-        grok_ref_images: finalRefs,
+        final_prompt: scene.raw_prompt,
+        grok_ref_images: refs.slice(0, 7),
       }
     }),
   }))
