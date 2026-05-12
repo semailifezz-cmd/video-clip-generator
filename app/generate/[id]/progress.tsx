@@ -183,6 +183,7 @@ export default function Progress({ id }: { id: string }) {
   const [scripts, setScripts] = useState<VideoScript[]>([])
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({})
+  const [pendingAssets, setPendingAssets] = useState<Array<{ name: string; type: string }>>([])
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const startedRef = useRef(false)
@@ -254,6 +255,7 @@ export default function Progress({ id }: { id: string }) {
       ]
 
       const newRefImages: Record<string, string> = {}
+      setPendingAssets(assetList.map(a => ({ name: a.name, type: a.type })))
 
       for (let i = 0; i < assetList.length; i++) {
         const asset = assetList[i]
@@ -653,21 +655,34 @@ export default function Progress({ id }: { id: string }) {
             )}
 
             {/* Reference images */}
-            {Object.keys(refImages).length > 0 && (
+            {pendingAssets.length > 0 && (
               <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
                 <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
-                  Reference Images ({Object.keys(refImages).length})
+                  Reference Images ({Object.keys(refImages).length} / {pendingAssets.length})
                 </p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                  {Object.entries(refImages).map(([name, url]) => (
-                    <div key={name} className="aspect-square bg-zinc-800 rounded-lg overflow-hidden relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={name} className="w-full h-full object-cover" />
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                        <p className="text-[10px] text-white font-medium truncate">{name}</p>
+                  {pendingAssets.map(({ name, type }) => {
+                    const url = refImages[name]
+                    return (
+                      <div key={name} className="aspect-square bg-zinc-800 rounded-lg overflow-hidden relative">
+                        {url ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={name} className="w-full h-full object-cover" />
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                              <p className="text-[10px] text-white font-medium truncate">{name}</p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-800/60">
+                            <div className="w-5 h-5 border-2 border-zinc-600 border-t-orange-400 rounded-full animate-spin" />
+                            <p className="text-[9px] font-mono text-zinc-600 text-center px-1 truncate w-full text-center">{name}</p>
+                            <p className="text-[9px] font-mono text-zinc-700">{type}</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
