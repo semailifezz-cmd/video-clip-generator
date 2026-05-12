@@ -22,10 +22,10 @@ Resolution: The challenge is solved! Everyone cheers, laughs, and dances togethe
 Ending: The hero shares a heartfelt lesson about kindness or teamwork. The scene closes on bright smiles and a rainbow-lit sky.`
 
 const VIDEO_LENGTHS = [
-  { label: '15 seconds', value: 15, desc: 'Ultra short — punchy and instant' },
-  { label: '30 seconds', value: 30, desc: 'Short-form — ideal for social media' },
-  { label: '60 seconds', value: 60, desc: 'Classic — full story arc' },
-  { label: '90 seconds', value: 90, desc: 'Extended — richer storytelling' },
+  { label: '6 seconds', value: 6, desc: 'Ultra short — punchy and instant' },
+  { label: '10 seconds', value: 10, desc: 'Quick hit — snappy story beat' },
+  { label: '15 seconds', value: 15, desc: 'Short-form — ideal for social media' },
+  { label: '30 seconds', value: 30, desc: 'Classic — full story arc (API max)' },
 ]
 
 const WORKFLOW_STEPS = ['① Universe', '② Assets', '③ Images', '④ Scripts', '⑤ Inject', '⑥ Video']

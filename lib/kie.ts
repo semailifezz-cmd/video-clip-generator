@@ -52,16 +52,14 @@ export async function pollTask(taskId: string): Promise<PollResult> {
     try {
       const parsed = JSON.parse(task.resultJson)
       resultUrls = parsed.resultUrls ?? []
-      if (parsed.errorMsg) failReason = parsed.errorMsg
-      if (parsed.error) failReason = parsed.error
     } catch {
       // non-critical
     }
   }
 
-  // Fall back to top-level fields Kie.ai may include
-  if (!failReason && task.errorMsg) failReason = task.errorMsg
-  if (!failReason && task.state === 'fail') failReason = `Task ${taskId} reported state=fail (no reason provided)`
+  // Top-level failure fields per Kie.ai docs: failMsg + failCode
+  if (task.failMsg) failReason = task.failCode ? `[${task.failCode}] ${task.failMsg}` : task.failMsg
+  if (!failReason && task.state === 'fail') failReason = `Task ${taskId} failed (no reason given)`
 
   return { state: task.state as KieState, resultUrls, failReason }
 }
@@ -77,6 +75,10 @@ export async function submitImageJob(prompt: string): Promise<string> {
 
 // Phase 6: Generate a 15-second video clip
 // Uses image-to-video when reference images are provided, text-to-video otherwise
+// Kie.ai supports 6–30 seconds only for both video models
+const KIE_MAX_DURATION = 30
+const KIE_MIN_DURATION = 6
+
 export async function submitVideoJob(payload: {
   prompt: string
   image_urls: string[]
@@ -84,12 +86,14 @@ export async function submitVideoJob(payload: {
   aspect_ratio: string
   resolution: string
 }): Promise<string> {
+  const clampedDuration = Math.min(KIE_MAX_DURATION, Math.max(KIE_MIN_DURATION, payload.duration))
+
   if (payload.image_urls.length > 0) {
     return createTask('grok-imagine/image-to-video', {
       image_urls: payload.image_urls,
       prompt: payload.prompt,
       mode: 'normal',
-      duration: String(payload.duration), // image-to-video expects string
+      duration: String(clampedDuration), // image-to-video expects string per docs
       aspect_ratio: payload.aspect_ratio,
       resolution: payload.resolution,
     })
@@ -97,7 +101,7 @@ export async function submitVideoJob(payload: {
   return createTask('grok-imagine/text-to-video', {
     prompt: payload.prompt,
     mode: 'normal',
-    duration: payload.duration, // text-to-video expects number
+    duration: clampedDuration, // text-to-video expects number per docs
     aspect_ratio: payload.aspect_ratio,
     resolution: payload.resolution,
   })
