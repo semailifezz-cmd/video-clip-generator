@@ -184,6 +184,7 @@ export default function Progress({ id }: { id: string }) {
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({})
   const [pendingAssets, setPendingAssets] = useState<Array<{ name: string; type: string }>>([])
+  const [imageErrors, setImageErrors] = useState<Record<string, string>>({})
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const startedRef = useRef(false)
@@ -261,33 +262,52 @@ export default function Progress({ id }: { id: string }) {
         const asset = assetList[i]
         setPhase(2, 'running', `Generating ${asset.type}: "${asset.name}" (${i + 1} / ${assetList.length})`, (i / assetList.length) * 100)
 
-        const submitRes = await fetch('/api/images', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: asset.prompt }),
-        })
-        if (!submitRes.ok) {
-          const err = await submitRes.json()
-          throw new Error(err.error ?? 'Image submission failed')
-        }
-        const { jobId } = await submitRes.json()
+        try {
+          const submitRes = await fetch('/api/images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: asset.prompt }),
+          })
+          const submitData = await submitRes.json()
+          if (!submitRes.ok || submitData.error) {
+            throw new Error(submitData.error ?? `Image submit failed (${submitRes.status})`)
+          }
+          const { jobId } = submitData
 
-        let url = ''
-        for (let attempt = 0; attempt < 40 && !url; attempt++) {
-          await sleep(3000)
-          const pollRes = await fetch(`/api/images/${jobId}`)
-          const { status, image_url } = await pollRes.json()
-          if (status === 'done' && image_url) url = image_url
-          else if (status === 'failed') throw new Error(`Image failed for "${asset.name}"`)
-        }
+          let url = ''
+          let assetErr = ''
+          for (let attempt = 0; attempt < 40 && !url && !assetErr; attempt++) {
+            await sleep(3000)
+            const pollRes = await fetch(`/api/images/${jobId}`)
+            const pollData = await pollRes.json()
+            if (!pollRes.ok || pollData.error) {
+              assetErr = pollData.error ?? `Poll failed (${pollRes.status})`
+              break
+            }
+            const { status, image_url, reason } = pollData
+            if (status === 'done' && image_url) url = image_url
+            else if (status === 'failed') {
+              assetErr = reason ?? `Image generation failed for "${asset.name}"`
+              break
+            }
+          }
 
-        if (url) {
-          newRefImages[asset.name] = url
-          setRefImages(prev => ({ ...prev, [asset.name]: url }))
+          if (url) {
+            newRefImages[asset.name] = url
+            setRefImages(prev => ({ ...prev, [asset.name]: url }))
+          } else {
+            const msg = assetErr || `Timed out after 2 min for "${asset.name}"`
+            setImageErrors(prev => ({ ...prev, [asset.name]: msg }))
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          setImageErrors(prev => ({ ...prev, [asset.name]: msg }))
         }
       }
 
-      setPhase(2, 'done', `${Object.keys(newRefImages).length} reference images generated`, 100)
+      const imgCount = Object.keys(newRefImages).length
+      const errCount = assetList.length - imgCount
+      setPhase(2, 'done', `${imgCount} images generated${errCount > 0 ? ` · ${errCount} failed` : ''}`, 100)
 
       // ── Phase 4: Video Scripts ─────────────────────────────────────────
       const allScripts: VideoScript[] = []
@@ -663,6 +683,7 @@ export default function Progress({ id }: { id: string }) {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {pendingAssets.map(({ name, type }) => {
                     const url = refImages[name]
+                    const err = imageErrors[name]
                     return (
                       <div key={name} className="aspect-square bg-zinc-800 rounded-lg overflow-hidden relative">
                         {url ? (
@@ -673,6 +694,11 @@ export default function Progress({ id }: { id: string }) {
                               <p className="text-[10px] text-white font-medium truncate">{name}</p>
                             </div>
                           </>
+                        ) : err ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-red-950/40 p-2">
+                            <p className="text-[10px] text-red-400 font-mono text-center truncate w-full">✕ {name}</p>
+                            <p className="text-[9px] text-red-300/60 font-mono text-center leading-tight line-clamp-3">{err}</p>
+                          </div>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-800/60">
                             <div className="w-5 h-5 border-2 border-zinc-600 border-t-orange-400 rounded-full animate-spin" />
