@@ -1,9 +1,74 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getDramaIndex, deleteDramaEntry } from '@/lib/dramaStore'
 import type { DramaEntry } from '@/lib/dramaStore'
+
+function NewVideoModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter()
+  const [prompt, setPrompt] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    textareaRef.current?.focus()
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!prompt.trim()) return
+    router.push(`/new?prompt=${encodeURIComponent(prompt.trim())}`)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+          <div>
+            <p className="font-mono text-[11px] tracking-widest uppercase text-orange-400 mb-1">New Video Set</p>
+            <h2 className="text-lg font-bold text-white">What's your video about?</h2>
+          </div>
+          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 text-xl transition-colors leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder="e.g. A cheerful magical forest where a curious young bunny named Pip and their animal friends go on fun adventures every day, discovering hidden treasures and learning about kindness"
+            rows={5}
+            className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-orange-500/60 focus:bg-zinc-800 transition-colors resize-none"
+            required
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2.5 rounded-xl text-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!prompt.trim()}
+              className="flex-1 bg-orange-500 hover:bg-orange-400 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+            >
+              Continue →
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 function formatDate(iso: string): string {
   try {
@@ -100,6 +165,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [dramas, setDramas] = useState<DramaEntry[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     setDramas(getDramaIndex())
@@ -116,6 +182,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      {showModal && <NewVideoModal onClose={() => setShowModal(false)} />}
       <nav className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between sticky top-0 z-10 bg-zinc-950/90 backdrop-blur">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-orange-500 rounded flex items-center justify-center text-white text-[11px] font-bold tracking-tight">
@@ -126,7 +193,7 @@ export default function Dashboard() {
           </span>
         </div>
         <button
-          onClick={() => router.push('/new')}
+          onClick={() => setShowModal(true)}
           className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           + New Series
@@ -148,7 +215,7 @@ export default function Dashboard() {
             <p className="text-zinc-600 font-mono text-sm mb-2">No series yet</p>
             <p className="text-zinc-700 text-xs mb-6">Create your first AI kids video series to get started.</p>
             <button
-              onClick={() => router.push('/new')}
+              onClick={() => setShowModal(true)}
               className="bg-orange-500 hover:bg-orange-400 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
             >
               + Create New Video Series

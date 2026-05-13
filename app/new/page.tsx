@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { upsertDramaEntry } from '@/lib/dramaStore'
 
 const DEFAULT_FORMULA = `Step 1 — Cheerful Introduction (0–25%)
@@ -34,8 +34,17 @@ const inputClass =
   'w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-orange-500/60 focus:bg-zinc-800 transition-colors'
 const labelClass = 'block text-xs font-medium text-zinc-400 mb-1.5'
 
-export default function NewVideoSeries() {
+export default function NewVideoSeriesPage() {
+  return (
+    <Suspense>
+      <NewVideoSeries />
+    </Suspense>
+  )
+}
+
+function NewVideoSeries() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [form, setForm] = useState({
     prompt: '',
     total_videos: 5,
@@ -44,6 +53,11 @@ export default function NewVideoSeries() {
     episode_formula: DEFAULT_FORMULA,
   })
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const p = searchParams.get('prompt')
+    if (p) setForm(prev => ({ ...prev, prompt: p }))
+  }, [searchParams])
 
   const set = (field: string) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
