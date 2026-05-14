@@ -257,9 +257,11 @@ export default function Progress({ id }: { id: string }) {
       const newRefImages: Record<string, string> = {}
       setPendingAssets(assetList.map(a => ({ name: a.name, type: a.type })))
 
-      const IMAGE_DEADLINE_MS = 5 * 60 * 1000   // 5 min total per asset
-      const RETRY_DELAY_MS    = 30 * 1000        // 30 s between job attempts
-      const POLL_INTERVAL_MS  = 5 * 1000         // 5 s between polls
+      const IMAGE_DEADLINE_MS    = 5 * 60 * 1000   // 5 min total per asset
+      const RETRY_DELAY_MS      = 30 * 1000        // 30 s between job attempts
+      const MAINTENANCE_DELAY_MS = 2 * 60 * 1000   // 2 min when server is under maintenance
+      const POLL_INTERVAL_MS    = 5 * 1000         // 5 s between polls
+      const isMaintenance = (msg: string) => msg.toLowerCase().includes('being maintained') || msg.toLowerCase().includes('maintenance')
 
       for (let i = 0; i < assetList.length; i++) {
         const asset = assetList[i]
@@ -276,6 +278,7 @@ export default function Progress({ id }: { id: string }) {
             (i / assetList.length) * 100
           )
 
+          let maintenanceErr = false
           try {
             const submitRes = await fetch('/api/images', {
               method: 'POST',
@@ -284,6 +287,7 @@ export default function Progress({ id }: { id: string }) {
             })
             const submitData = await submitRes.json()
             if (!submitRes.ok || submitData.error) {
+              if (isMaintenance(submitData.error ?? '')) maintenanceErr = true
               throw new Error(submitData.error ?? `Submit failed (${submitRes.status})`)
             }
             const { jobId } = submitData
@@ -298,18 +302,20 @@ export default function Progress({ id }: { id: string }) {
               if (status === 'done' && image_url) { url = image_url }
               else if (status === 'failed') { jobDone = true }
             }
-          } catch {
-            // submission error — fall through to retry delay
+          } catch (e) {
+            if (isMaintenance(e instanceof Error ? e.message : String(e))) maintenanceErr = true
           }
 
           if (!url && Date.now() < deadline) {
+            const retryDelay = maintenanceErr ? MAINTENANCE_DELAY_MS : RETRY_DELAY_MS
+            const retryLabel = maintenanceErr ? '2 min (server maintenance)' : '30s'
             const remaining2 = Math.round((deadline - Date.now()) / 1000)
             setPhase(
               2, 'running',
-              `${asset.type}: "${asset.name}" — retrying in 30s · ${remaining2}s left (${i + 1}/${assetList.length})`,
+              `${asset.type}: "${asset.name}" — retrying in ${retryLabel} · ${remaining2}s left (${i + 1}/${assetList.length})`,
               (i / assetList.length) * 100
             )
-            await sleep(RETRY_DELAY_MS)
+            await sleep(retryDelay)
           }
         }
 
@@ -389,7 +395,14 @@ export default function Progress({ id }: { id: string }) {
           })
           if (!submitRes.ok) {
             const err = await submitRes.json()
-            throw new Error(err.error ?? `Video submission failed for ${key}`)
+            const errMsg = err.error ?? `Video submission failed for ${key}`
+            if (isMaintenance(errMsg)) {
+              const remaining = Math.round((deadline - Date.now()) / 1000)
+              setPhase(5, 'running', `Video ${i + 1}/${allScenes.length} — Server maintenance, retrying in 2 min… (${remaining}s left)`, (i / allScenes.length) * 100)
+              await sleep(2 * 60 * 1000)
+              continue
+            }
+            throw new Error(errMsg)
           }
           const { jobId } = await submitRes.json()
 
